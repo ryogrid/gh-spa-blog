@@ -1,0 +1,119 @@
+<!-- Simple Blog SPA
+     - Single HTML file
+     - Fetches posts from DATA_URL (static JSON)
+     JSON schema expected:
+     {
+       "meta": {
+         "blogTitle": "string",
+         "version": 1
+       },
+       "posts": [
+         {
+           "id": number,
+           "title": "string",
+           "author": "string",
+           "published": "ISO8601 string",
+           "tags": ["string", ...],
+           "content": "HTML string"
+         }
+       ]
+     }
+--><!DOCTYPE html><html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple Blog</title>
+<style>
+:root { --accent:#2d6cdf; --bg:#f9f9fb; --text:#222; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;}
+body{margin:0;background:var(--bg);color:var(--text);} 
+header{background:var(--accent);color:white;padding:1rem 1.5rem;font-size:1.5rem;font-weight:bold;}
+main{max-width:800px;margin:2rem auto;padding:0 1rem;}
+a{color:var(--accent);text-decoration:none;}
+article{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid #ddd;}
+h2{margin-top:0;}
+.tag{display:inline-block;background:#e6eefc;color:var(--accent);padding:2px 8px;margin-right:6px;border-radius:4px;font-size:0.75rem;}
+.back{display:inline-block;margin-bottom:1rem;}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141416;--text:#f1f1f1;}
+  header{background:#1f4180;}
+  article{border-color:#333;}
+  .tag{background:#344f8a;color:#aecdff;}
+}
+</style>
+</head>
+<body>
+<header id="header">Simple Blog</header>
+<main id="app">Loading posts...</main><script>
+const DATA_URL = 'https://example.com/blog-data.json'; // ★差し替えてください
+
+/** @typedef {{id:number,title:string,author:string,published:string,tags:string[],content:string}} Post */
+
+/** State */
+let posts = /** @type {Post[]} */ ([]);
+
+/** Utilities */
+const qs = sel => document.querySelector(sel);
+/** Format date to locale string */
+function fmtDate(iso){
+  try{
+    return new Date(iso).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+  }catch(e){return iso;}
+}
+
+/** Routing */
+function router(){
+  const hash = location.hash;
+  if(hash.startsWith('#post-')){
+    const id = Number(hash.replace('#post-',''));
+    renderPost(id);
+  }else{
+    renderList();
+  }
+}
+
+function renderList(){
+  const app = qs('#app');
+  if(!posts.length){ app.textContent = 'No posts found.'; return;}
+  app.innerHTML = posts.map(p=>`
+    <article>
+      <h2><a href="#post-${p.id}">${p.title}</a></h2>
+      <div style="font-size:0.875rem;color:gray;">${fmtDate(p.published)} · by ${p.author}</div>
+      <p>${p.content.replace(/<[^>]+>/g,'').slice(0,140)}...</p>
+      <div>${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </article>
+  `).join('');
+}
+
+function renderPost(id){
+  const post = posts.find(p=>p.id===id);
+  const app = qs('#app');
+  if(!post){ app.textContent = 'Post not found.'; return;}
+  app.innerHTML = `
+    <a class="back" href="#">&larr; Back to list</a>
+    <article>
+      <h2>${post.title}</h2>
+      <div style="font-size:0.875rem;color:gray;">${fmtDate(post.published)} · by ${post.author}</div>
+      <div>${post.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div style="margin-top:1rem;">${post.content}</div>
+    </article>
+  `;
+}
+
+/** Bootstrap */
+fetch(DATA_URL)
+  .then(res=>{
+    if(!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+    return res.json();
+  })
+  .then(json=>{
+    posts = Array.isArray(json.posts)? json.posts: [];
+    qs('#header').textContent = json.meta?.blogTitle || 'Simple Blog';
+    router();
+  })
+  .catch(err=>{
+    qs('#app').textContent = err.message;
+  });
+
+window.addEventListener('hashchange', router);
+</script></body>
+</html>
